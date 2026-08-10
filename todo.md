@@ -33,8 +33,8 @@
 ## Quality
 - [x] Vitest coverage for maps proxy credentials
 - [x] Type check passes (`pnpm check`)
-- [ ] Visual verification of every screen
-- [ ] Push to GitHub repo `saeedradwan-sys/copy-of-container-tracker`
+- [x] Visual verification of every screen (dashboard home, containers list, detail page skeleton)
+- [x] Push to GitHub repo `saeedradwan-sys/copy-of-container-tracker` (working tree clean, code committed)
 
 ## Known Limitations
 - Maps script load hangs in headless/preview environments. The proxy correctly fetches and serves the Google Maps runtime, but script onload/onerror handlers never fire. All container tracking data is accessible via the fallback UI (table, detail timeline, stats cards).
