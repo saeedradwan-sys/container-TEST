@@ -86,27 +86,46 @@ declare global {
   }
 }
 
-const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
-const FORGE_BASE_URL =
-  import.meta.env.VITE_FRONTEND_FORGE_API_URL ||
-  "https://forge.butterfly-effect.dev";
-const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
+/**
+ * The Maps runtime is fetched from our own server (`server/mapsProxy.ts`), which
+ * attaches the Origin header the upstream Forge proxy requires. Loading the
+ * upstream URL directly from the browser fails whenever the page origin differs
+ * from the registered project origin (e.g. localhost during preview).
+ */
+const MAPS_SCRIPT_URL = "/api/maps/js?libraries=marker,places,geocoding,geometry";
 
-function loadMapScript() {
-  return new Promise(resolve => {
+/**
+ * Singleton loader promise. Multiple MapView instances (or remounts during HMR)
+ * must share one script load instead of injecting the tag repeatedly.
+ */
+let mapScriptPromise: Promise<void> | null = null;
+
+function loadMapScript(): Promise<void> {
+  if (window.google?.maps) return Promise.resolve();
+  if (mapScriptPromise) return mapScriptPromise;
+
+  mapScriptPromise = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
+    script.src = MAPS_SCRIPT_URL;
     script.async = true;
-    script.crossOrigin = "anonymous";
+    // The tag is intentionally left in the document: the Maps runtime keeps
+    // loading additional chunks relative to it after the initial onload.
     script.onload = () => {
-      resolve(null);
-      script.remove(); // Clean up immediately
+      if (window.google?.maps) {
+        resolve();
+      } else {
+        mapScriptPromise = null;
+        reject(new Error("Google Maps loaded without exposing window.google.maps"));
+      }
     };
     script.onerror = () => {
-      console.error("Failed to load Google Maps script");
+      mapScriptPromise = null;
+      reject(new Error("Failed to load Google Maps script"));
     };
     document.head.appendChild(script);
   });
+
+  return mapScriptPromise;
 }
 
 interface MapViewProps {
@@ -114,6 +133,8 @@ interface MapViewProps {
   initialCenter?: google.maps.LatLngLiteral;
   initialZoom?: number;
   onMapReady?: (map: google.maps.Map) => void;
+  /** Called when the Maps runtime cannot be loaded, so callers can show a fallback. */
+  onError?: (error: Error) => void;
 }
 
 export function MapView({
@@ -121,27 +142,36 @@ export function MapView({
   initialCenter = { lat: 37.7749, lng: -122.4194 },
   initialZoom = 12,
   onMapReady,
+  onError,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
 
   const init = usePersistFn(async () => {
-    await loadMapScript();
-    if (!mapContainer.current) {
-      console.error("Map container not found");
-      return;
-    }
-    map.current = new window.google.maps.Map(mapContainer.current, {
-      zoom: initialZoom,
-      center: initialCenter,
-      mapTypeControl: true,
-      fullscreenControl: true,
-      zoomControl: true,
-      streetViewControl: true,
-      mapId: "DEMO_MAP_ID",
-    });
-    if (onMapReady) {
-      onMapReady(map.current);
+    try {
+      await loadMapScript();
+      if (!mapContainer.current) {
+        console.error("Map container not found");
+        return;
+      }
+      if (map.current) {
+        // Already initialised (e.g. StrictMode double effect).
+        onMapReady?.(map.current);
+        return;
+      }
+      map.current = new window.google.maps.Map(mapContainer.current, {
+        zoom: initialZoom,
+        center: initialCenter,
+        mapTypeControl: true,
+        fullscreenControl: true,
+        zoomControl: true,
+        streetViewControl: true,
+        mapId: "DEMO_MAP_ID",
+      });
+      onMapReady?.(map.current);
+    } catch (error) {
+      console.error(error);
+      onError?.(error instanceof Error ? error : new Error(String(error)));
     }
   });
 

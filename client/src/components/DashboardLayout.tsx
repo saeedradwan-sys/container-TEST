@@ -21,15 +21,16 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import { Container, LayoutDashboard, LogOut, Map, PanelLeft, Ship } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+  { icon: LayoutDashboard, label: "Overview", path: "/" },
+  { icon: Container, label: "Containers", path: "/containers" },
+  { icon: Map, label: "Fleet Map", path: "/map" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -167,10 +168,18 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed ? (
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold tracking-tight truncate">
-                    Navigation
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-sidebar-primary/15 text-sidebar-primary shrink-0">
+                    <Ship className="h-4 w-4" />
                   </span>
+                  <div className="min-w-0 leading-tight">
+                    <p className="font-display text-[0.95rem] truncate">
+                      Container Tracker
+                    </p>
+                    <p className="text-[0.65rem] uppercase tracking-[0.14em] text-sidebar-foreground/55 truncate">
+                      Ocean Freight
+                    </p>
+                  </div>
                 </div>
               ) : null}
             </div>

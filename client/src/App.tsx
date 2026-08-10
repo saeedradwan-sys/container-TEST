@@ -4,13 +4,19 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import ContainerDetail from "./pages/ContainerDetail";
+import Containers from "./pages/Containers";
+import FleetMap from "./pages/FleetMap";
 import Home from "./pages/Home";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
+  // Every route renders inside DashboardLayout, which gates on authentication.
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/containers"} component={Containers} />
+      <Route path={"/containers/:containerNumber"} component={ContainerDetail} />
+      <Route path={"/map"} component={FleetMap} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
