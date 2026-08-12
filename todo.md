@@ -53,8 +53,8 @@
 - [x] Database integration test verifies all 13 seeded containers expose current coordinates and complete origin/destination coordinates
 - [x] Responsive preview verification completed at desktop and mobile widths
 - [x] Production build and full Vitest suite pass after the map replacement
-- [ ] Verify the published bundle contains the dependency-free current-location map
+- [x] Verify the published bundle contains the dependency-free current-location map (live bundle includes current-position and route metadata)
 
 ## Delivery
 - [x] Save final checkpoint with the working current-location map (checkpoint d5c7c994)
-- [ ] Confirm the published version is live with the current-location map bundle
+- [x] Confirm the published version is live with the current-location map bundle (HTTP 200; live bundle verified)
