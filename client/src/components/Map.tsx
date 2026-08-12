@@ -1,185 +1,76 @@
-/**
- * GOOGLE MAPS FRONTEND INTEGRATION - ESSENTIAL GUIDE
- *
- * USAGE FROM PARENT COMPONENT:
- * ======
- *
- * const mapRef = useRef<google.maps.Map | null>(null);
- *
- * <MapView
- *   initialCenter={{ lat: 40.7128, lng: -74.0060 }}
- *   initialZoom={15}
- *   onMapReady={(map) => {
- *     mapRef.current = map; // Store to control map from parent anytime, google map itself is in charge of the re-rendering, not react state.
- * </MapView>
- *
- * ======
- * Available Libraries and Core Features:
- * -------------------------------
- * 📍 MARKER (from `marker` library)
- * - Attaches to map using { map, position }
- * new google.maps.marker.AdvancedMarkerElement({
- *   map,
- *   position: { lat: 37.7749, lng: -122.4194 },
- *   title: "San Francisco",
- * });
- *
- * -------------------------------
- * 🏢 PLACES (from `places` library)
- * - Does not attach directly to map; use data with your map manually.
- * const place = new google.maps.places.Place({ id: PLACE_ID });
- * await place.fetchFields({ fields: ["displayName", "location"] });
- * map.setCenter(place.location);
- * new google.maps.marker.AdvancedMarkerElement({ map, position: place.location });
- *
- * -------------------------------
- * 🧭 GEOCODER (from `geocoding` library)
- * - Standalone service; manually apply results to map.
- * const geocoder = new google.maps.Geocoder();
- * geocoder.geocode({ address: "New York" }, (results, status) => {
- *   if (status === "OK" && results[0]) {
- *     map.setCenter(results[0].geometry.location);
- *     new google.maps.marker.AdvancedMarkerElement({
- *       map,
- *       position: results[0].geometry.location,
- *     });
- *   }
- * });
- *
- * -------------------------------
- * 📐 GEOMETRY (from `geometry` library)
- * - Pure utility functions; not attached to map.
- * const dist = google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
- *
- * -------------------------------
- * 🛣️ ROUTES (from `routes` library)
- * - Combines DirectionsService (standalone) + DirectionsRenderer (map-attached)
- * const directionsService = new google.maps.DirectionsService();
- * const directionsRenderer = new google.maps.DirectionsRenderer({ map });
- * directionsService.route(
- *   { origin, destination, travelMode: "DRIVING" },
- *   (res, status) => status === "OK" && directionsRenderer.setDirections(res)
- * );
- *
- * -------------------------------
- * 🌦️ MAP LAYERS (attach directly to map)
- * - new google.maps.TrafficLayer().setMap(map);
- * - new google.maps.TransitLayer().setMap(map);
- * - new google.maps.BicyclingLayer().setMap(map);
- *
- * -------------------------------
- * ✅ SUMMARY
- * - “map-attached” → AdvancedMarkerElement, DirectionsRenderer, Layers.
- * - “standalone” → Geocoder, DirectionsService, DistanceMatrixService, ElevationService.
- * - “data-only” → Place, Geometry utilities.
- */
-
-/// <reference types="@types/google.maps" />
-
-import { useEffect, useRef } from "react";
-import { usePersistFn } from "@/hooks/usePersistFn";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-declare global {
-  interface Window {
-    google?: typeof google;
-  }
-}
-
-/**
- * The Maps runtime is fetched from our own server (`server/mapsProxy.ts`), which
- * attaches the Origin header the upstream Forge proxy requires. Loading the
- * upstream URL directly from the browser fails whenever the page origin differs
- * from the registered project origin (e.g. localhost during preview).
- */
-const MAPS_SCRIPT_URL = "/api/maps/js?libraries=marker,places,geocoding,geometry";
-
-/**
- * Singleton loader promise. Multiple MapView instances (or remounts during HMR)
- * must share one script load instead of injecting the tag repeatedly.
- */
-let mapScriptPromise: Promise<void> | null = null;
-
-function loadMapScript(): Promise<void> {
-  if (window.google?.maps) return Promise.resolve();
-  if (mapScriptPromise) return mapScriptPromise;
-
-  mapScriptPromise = new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = MAPS_SCRIPT_URL;
-    script.async = true;
-    // The tag is intentionally left in the document: the Maps runtime keeps
-    // loading additional chunks relative to it after the initial onload.
-    script.onload = () => {
-      if (window.google?.maps) {
-        resolve();
-      } else {
-        mapScriptPromise = null;
-        reject(new Error("Google Maps loaded without exposing window.google.maps"));
-      }
-    };
-    script.onerror = () => {
-      mapScriptPromise = null;
-      reject(new Error("Failed to load Google Maps script"));
-    };
-    document.head.appendChild(script);
-  });
-
-  return mapScriptPromise;
-}
-
-interface MapViewProps {
+type MapViewProps = {
   className?: string;
-  initialCenter?: google.maps.LatLngLiteral;
-  initialZoom?: number;
-  onMapReady?: (map: google.maps.Map) => void;
-  /** Called when the Maps runtime cannot be loaded, so callers can show a fallback. */
-  onError?: (error: Error) => void;
-}
+  children?: ReactNode;
+  ariaLabel?: string;
+};
 
-export function MapView({
-  className,
-  initialCenter = { lat: 37.7749, lng: -122.4194 },
-  initialZoom = 12,
-  onMapReady,
-  onError,
-}: MapViewProps) {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<google.maps.Map | null>(null);
-
-  const init = usePersistFn(async () => {
-    try {
-      await loadMapScript();
-      if (!mapContainer.current) {
-        console.error("Map container not found");
-        return;
-      }
-      if (map.current) {
-        // Already initialised (e.g. StrictMode double effect).
-        onMapReady?.(map.current);
-        return;
-      }
-      map.current = new window.google.maps.Map(mapContainer.current, {
-        zoom: initialZoom,
-        center: initialCenter,
-        mapTypeControl: true,
-        fullscreenControl: true,
-        zoomControl: true,
-        streetViewControl: true,
-        mapId: "DEMO_MAP_ID",
-      });
-      onMapReady?.(map.current);
-    } catch (error) {
-      console.error(error);
-      onError?.(error instanceof Error ? error : new Error(String(error)));
-    }
-  });
-
-  useEffect(() => {
-    init();
-  }, [init]);
-
+/**
+ * A dependency-free ocean map canvas used by the tracker. The previous
+ * Google Maps runtime depended on a browser-origin handshake that failed in
+ * preview and production. RouteMap supplies live SVG overlays on this stable
+ * canvas, so coordinates, ports, and routes render without an external SDK.
+ */
+export function MapView({ className, children, ariaLabel = "Ocean freight map" }: MapViewProps) {
   return (
-    <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
+    <div
+      className={cn("relative isolate overflow-hidden bg-[#0b263d]", className)}
+      role="img"
+      aria-label={ariaLabel}
+    >
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 1200 600"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id="ocean-gradient" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#123d57" />
+            <stop offset="0.5" stopColor="#0b2d46" />
+            <stop offset="1" stopColor="#071e32" />
+          </linearGradient>
+          <pattern id="ocean-grid" width="100" height="60" patternUnits="userSpaceOnUse">
+            <path d="M 100 0 L 0 0 0 60" fill="none" stroke="#8fc7d3" strokeOpacity="0.09" strokeWidth="1" />
+          </pattern>
+          <filter id="coast-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#041321" floodOpacity="0.35" />
+          </filter>
+        </defs>
+        <rect width="1200" height="600" fill="url(#ocean-gradient)" />
+        <rect width="1200" height="600" fill="url(#ocean-grid)" />
+        <path
+          d="M0 0h184l22 26 14 27-10 25 20 32-12 34 24 30-8 35 20 34-22 38 15 45-22 36 8 45-24 34H0Zm1200 0h-145l-18 26 12 30-24 30 15 31-18 29 11 33-21 37 20 35-11 39 24 36-12 44 22 38-19 37 18 38 34 26h112ZM382 0l25 30-7 28 20 24-13 32 18 31-9 36 20 36-17 34 12 36-21 34 18 31-14 36 19 34-29 42 17 36-13 34 24 30-24 35 15 27H270l24-39-15-28 20-31-11-33 22-35-12-34 19-39-18-36 13-34-20-32 14-35-15-34 20-34-10-35 21-34-12-34 21-29Z"
+          fill="#163f51"
+          fillOpacity="0.82"
+          filter="url(#coast-shadow)"
+        />
+        <path
+          d="M694 0l20 31-12 31 17 28-18 35 22 32-15 36 19 32-17 36 15 35-22 35 17 35-18 32 16 34-24 34 18 33-15 33 23 32-18 37 22 32-13 30 17 32H594l21-31-14-34 18-34-13-38 18-32-16-36 20-32-15-36 21-34-17-34 20-31-14-35 18-35-12-34 19-31-16-31 18-31-13-30Z"
+          fill="#1a4a58"
+          fillOpacity="0.78"
+          filter="url(#coast-shadow)"
+        />
+        <path
+          d="M1030 0l-14 32 19 28-13 30 22 30-14 33 13 28-20 35 16 33-22 34 17 33-21 34 15 33-19 36 18 30-23 40 17 31-14 35 17 34-18 34h174V0ZM355 472l16 23-17 25 12 27-24 29-29-4-15-24 12-24-13-26 24-27Z"
+          fill="#205263"
+          fillOpacity="0.75"
+          filter="url(#coast-shadow)"
+        />
+        <g fill="none" stroke="#a4dce0" strokeOpacity="0.16" strokeWidth="1">
+          <path d="M0 300h1200" />
+          <path d="M0 150h1200" />
+          <path d="M0 450h1200" />
+          <path d="M300 0v600" />
+          <path d="M600 0v600" />
+          <path d="M900 0v600" />
+        </g>
+      </svg>
+      <div className="relative h-full w-full">{children}</div>
+    </div>
   );
 }
+
+export default MapView;

@@ -37,4 +37,23 @@
 - [x] Push to GitHub repo `saeedradwan-sys/copy-of-container-tracker` (working tree clean, code committed)
 
 ## Known Limitations
-- Maps script load hangs in headless/preview environments. The proxy correctly fetches and serves the Google Maps runtime, but script onload/onerror handlers never fire. All container tracking data is accessible via the fallback UI (table, detail timeline, stats cards).
+- The old Google Maps runtime was removed because its origin-handshake loader could hang in preview environments. The tracker now uses a dependency-free SVG ocean map driven directly by latitude/longitude values from the database, so positions and routes render without an external map SDK.
+- The container detail API remains authentication-protected. In an unauthenticated preview, the detail page correctly shows its loading/auth state; after login it uses the same verified RouteMap renderer.
+
+## Map Fix (Critical)
+- [x] Diagnose Google Maps script load hang and find root cause
+- [x] Implement working map solution with a dependency-free SVG coordinate renderer
+- [x] Display container locations with status-colored markers and current-position labels
+- [x] Show origin→destination routes with solid travelled legs and dashed remaining legs
+- [x] Test map with real container data (13 current positions rendered in preview)
+- [x] Verify the fleet map renders on desktop and mobile; the protected detail route reuses the same RouteMap component
+
+## Map Verification Evidence
+- [x] Pure RouteMap tests verify current-position and route-count rendering logic
+- [x] Database integration test verifies all 13 seeded containers expose current coordinates and complete origin/destination coordinates
+- [x] Responsive preview verification completed at desktop and mobile widths
+- [x] Production build and full Vitest suite pass after the map replacement
+
+## Delivery
+- [ ] Save final checkpoint with the working current-location map
+- [ ] Confirm the published version is live
